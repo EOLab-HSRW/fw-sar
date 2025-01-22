@@ -1,0 +1,72 @@
+name: Tag Release
+
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'version'
+
+
+jobs:
+  tag_release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Configure Git user
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+
+    - name: Read version from file
+      id: read_version
+      run: |
+        if [ ! -f ./version ]; then
+          echo "Error: version file not found"
+          exit 1
+        fi
+
+        VERSION=$(cat ./version)
+
+        if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Error: Version format is invalid. Expected format is v0.0.0"
+          exit 1
+        fi
+
+        if [ -z "$VERSION" ]; then
+          echo "Error: VERSION is empty"
+          exit 1
+        fi
+
+        echo "VERSION is: $VERSION"
+
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Check if tag exists and skip if it does
+      id: check_tag
+      run: |
+        git fetch --all
+        TAG="$VERSION"
+
+        echo "TAG is: $TAG"
+
+        if git rev-parse "$TAG" >/dev/null 2>&1; then
+          echo "Tag $TAG already exists. Skipping tag creation."
+          exit 0
+        fi
+
+    - name: Create and push new tag
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        TAG="$VERSION"
+
+        echo "Final TAG is: $TAG"
+
+        # Create the tag and push it
+        git tag -a "$TAG" -m "Release $TAG"
+        git push origin "$TAG"
